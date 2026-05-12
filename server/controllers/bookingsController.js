@@ -1,8 +1,12 @@
 const db = require('../config/db')
+const {
+  sendBookingConfirmation,
+  sendAdminNotification,
+  sendStatusUpdate,
+} = require('../services/emailService')
 
 /* ── POST /api/bookings ─────────────────────────────────────
-   Crée une réservation (public)
-   Body : { car_id, first_name, last_name, email, phone, license, address, start_date, end_date }
+   Crée une réservation + envoie les emails de confirmation
    ────────────────────────────────────────────────────────── */
 async function createBooking(req, res) {
   try {
@@ -13,25 +17,25 @@ async function createBooking(req, res) {
     } = req.body
 
     /* Validation */
-    if (!car_id || !first_name || !last_name || !email || !phone || !license || !address || !start_date || !end_date) {
+    if (!car_id || !first_name || !last_name || !email || !phone
+        || !license || !address || !start_date || !end_date) {
       return res.status(400).json({ message: 'Tous les champs sont requis' })
     }
 
     /* Vérifier que la voiture existe */
-    const [cars] = await db.query('SELECT id, price FROM cars WHERE id = ?', [car_id])
+    const [cars] = await db.query('SELECT id, name, brand, price FROM cars WHERE id = ?', [car_id])
     if (!cars.length) return res.status(404).json({ message: 'Voiture introuvable' })
 
-    /* Calculer le nombre de jours et le total */
-    const start     = new Date(start_date)
-    const end       = new Date(end_date)
-    const days      = Math.max(1, Math.ceil((end - start) / 86400000))
-    const total     = days * cars[0].price
+    /* Calculer durée et total */
+    const start  = new Date(start_date)
+    const end    = new Date(end_date)
+    const days   = Math.max(1, Math.ceil((end - start) / 86400000))
+    const total  = days * cars[0].price
 
-    /* Vérifier la disponibilité (pas de chevauchement) */
+    /* Vérifier disponibilité */
     const [conflicts] = await db.query(
       `SELECT id FROM bookings
-       WHERE car_id = ?
-         AND status != 'cancelled'
+       WHERE car_id = ? AND status != 'cancelled'
          AND NOT (end_date < ? OR start_date > ?)`,
       [car_id, start_date, end_date]
     )
@@ -39,17 +43,35 @@ async function createBooking(req, res) {
       return res.status(409).json({ message: 'Ce véhicule n\'est pas disponible pour ces dates' })
     }
 
+    /* Insérer */
     const [result] = await db.query(
       `INSERT INTO bookings
-         (car_id, first_name, last_name, email, phone, license, address, start_date, end_date, days, total, status)
+         (car_id, first_name, last_name, email, phone, license, address,
+          start_date, end_date, days, total, status)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending')`,
-      [car_id, first_name, last_name, email, phone, license, address, start_date, end_date, days, total]
+      [car_id, first_name, last_name, email, phone, license, address,
+       start_date, end_date, days, total]
     )
+
+    const bookingId = result.insertId
+
+    /* Objet complet pour les emails */
+    const bookingData = {
+      id:         bookingId,
+      car_name:   cars[0].name,
+      car_brand:  cars[0].brand,
+      first_name, last_name, email, phone,
+      address, start_date, end_date, days, total,
+    }
+
+    /* ── Envoi des emails (non-bloquant) ── */
+    sendBookingConfirmation(bookingData)  // email au client
+    sendAdminNotification(bookingData)   // email à l'admin
 
     res.status(201).json({
       success: true,
-      message: 'Réservation créée avec succès',
-      data:    { id: result.insertId, days, total },
+      message: 'Réservation créée. Un email de confirmation vous a été envoyé.',
+      data:    { id: bookingId, days, total },
     })
   } catch (err) {
     console.error('[createBooking]', err)
@@ -57,9 +79,7 @@ async function createBooking(req, res) {
   }
 }
 
-/* ── GET /api/bookings ──────────────────────────────────────
-   Liste toutes les réservations (admin)
-   ────────────────────────────────────────────────────────── */
+/* ── GET /api/bookings ──────────────────────────────────────  */
 async function getAllBookings(req, res) {
   try {
     const [rows] = await db.query(
@@ -94,21 +114,38 @@ async function getBookingById(req, res) {
 }
 
 /* ── PUT /api/bookings/:id ──────────────────────────────────
-   Met à jour le statut : pending | confirmed | cancelled
+   Met à jour le statut + envoie un email au client
    ────────────────────────────────────────────────────────── */
 async function updateBookingStatus(req, res) {
   try {
     const { status } = req.body
     const allowed = ['pending', 'confirmed', 'cancelled']
     if (!allowed.includes(status)) {
-      return res.status(400).json({ message: `Statut invalide. Valeurs acceptées : ${allowed.join(', ')}` })
+      return res.status(400).json({ message: `Statut invalide. Valeurs : ${allowed.join(', ')}` })
     }
+
+    /* Récupère la réservation + infos voiture pour l'email */
+    const [rows] = await db.query(
+      `SELECT b.*, c.name AS car_name, c.brand AS car_brand
+       FROM bookings b
+       JOIN cars c ON c.id = b.car_id
+       WHERE b.id = ?`,
+      [req.params.id]
+    )
+    if (!rows.length) return res.status(404).json({ message: 'Réservation introuvable' })
+
+    const booking = rows[0]
 
     const [result] = await db.query(
       'UPDATE bookings SET status = ? WHERE id = ?',
       [status, req.params.id]
     )
     if (result.affectedRows === 0) return res.status(404).json({ message: 'Réservation introuvable' })
+
+    /* Email de mise à jour si confirmed ou cancelled */
+    if (status === 'confirmed' || status === 'cancelled') {
+      sendStatusUpdate(booking, status)
+    }
 
     res.json({ success: true, message: 'Statut mis à jour' })
   } catch (err) {
@@ -129,4 +166,7 @@ async function deleteBooking(req, res) {
   }
 }
 
-module.exports = { createBooking, getAllBookings, getBookingById, updateBookingStatus, deleteBooking }
+module.exports = {
+  createBooking, getAllBookings, getBookingById,
+  updateBookingStatus, deleteBooking,
+}
