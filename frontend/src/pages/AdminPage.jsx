@@ -591,4 +591,3 @@ function ModalBox({ title,onClose,children }) {
     </motion.div>
   )
 }
-ENDOFFILE
