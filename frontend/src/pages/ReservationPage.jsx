@@ -46,7 +46,7 @@ export default function ReservationPage() {
       try {
         setLoadingCars(true)
         const res = await fetchCars()
-        const list = res.data || []
+        const list = res.data || res || []
         setCars(list)
         if (preselectedId) {
           const found = list.find(c => c.id === preselectedId)
