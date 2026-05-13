@@ -1,79 +1,123 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { useSearchParams, Link } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useForm } from 'react-hook-form'
 import toast from 'react-hot-toast'
-import { ChevronRight, ChevronLeft, Check, Car, User, Calendar, CreditCard, AlertCircle } from 'lucide-react'
+import {
+  ChevronRight, ChevronLeft, Check, Car, User,
+  Calendar, CreditCard, AlertCircle, Loader2
+} from 'lucide-react'
+import { fetchCars } from '../services/carsService'
+import { createBooking } from '../services/bookingsService'
 
-/* ─── Demo car list (same IDs as catalogue) ─────────────── */
-const CARS = [
-  { id:1,  name:'Ferrari Roma',          brand:'Ferrari',      price:580000, image:'https://images.unsplash.com/photo-1592198084033-aade902d1aae?w=400&q=80' },
-  { id:2,  name:'Lamborghini Huracán',   brand:'Lamborghini',  price:790000, image:'https://images.unsplash.com/photo-1544636331-e26879cd4d9b?w=400&q=80' },
-  { id:3,  name:'Porsche 911 GT3',       brand:'Porsche',      price:425000, image:'https://images.unsplash.com/photo-1503376780353-7e6692767b70?w=400&q=80' },
-  { id:4,  name:'Rolls-Royce Ghost',     brand:'Rolls-Royce',  price:640000, image:'https://images.unsplash.com/photo-1631295868223-63265b40d9e4?w=400&q=80' },
-  { id:5,  name:'Bentley Continental',   brand:'Bentley',      price:555000, image:'https://images.unsplash.com/photo-1563137397-04f0311f8e4a?w=400&q=80' },
-  { id:6,  name:'McLaren 720S',          brand:'McLaren',      price:685000, image:'https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=400&q=80' },
-  { id:7,  name:'Mercedes-AMG GT',       brand:'Mercedes',     price:360000, image:'https://images.unsplash.com/photo-1618843479313-40f8afb4b4d8?w=400&q=80' },
-  { id:8,  name:'Tesla Model S Plaid',   brand:'Tesla',        price:210000, image:'https://images.unsplash.com/photo-1617788138017-80ad40651399?w=400&q=80' },
-]
-
+/* ── Steps ── */
 const STEPS = [
-  { id:1, label:'Véhicule',   icon: Car       },
-  { id:2, label:'Dates',      icon: Calendar  },
-  { id:3, label:'Vos infos',  icon: User      },
+  { id:1, label:'Véhicule',    icon: Car      },
+  { id:2, label:'Dates',       icon: Calendar },
+  { id:3, label:'Vos infos',   icon: User     },
   { id:4, label:'Confirmation',icon: Check    },
 ]
 
 const pageVariants = {
   initial: { opacity:0, y:20 },
   enter:   { opacity:1, y:0, transition:{ duration:0.5, ease:[0.19,1,0.22,1] } },
-  exit:    { opacity:0,       transition:{ duration:0.3 } },
+  exit:    { opacity:0,      transition:{ duration:0.3 } },
 }
 
 export default function ReservationPage() {
   const [searchParams] = useSearchParams()
   const preselectedId  = Number(searchParams.get('car'))
 
-  const [step,         setStep]     = useState(preselectedId ? 2 : 1)
-  const [selectedCar,  setCar]      = useState(CARS.find(c => c.id === preselectedId) || null)
-  const [startDate,    setStartDate] = useState('')
-  const [endDate,      setEndDate]   = useState('')
-  const [submitted,    setSubmitted] = useState(false)
+  const [step,        setStep]       = useState(1)
+  const [cars,        setCars]       = useState([])
+  const [loadingCars, setLoadingCars] = useState(true)
+  const [selectedCar, setCar]        = useState(null)
+  const [startDate,   setStartDate]  = useState('')
+  const [endDate,     setEndDate]    = useState('')
+  const [submitting,  setSubmitting] = useState(false)
+  const [submitted,   setSubmitted]  = useState(false)
+  const [bookingRef,  setBookingRef] = useState(null)
 
   const { register, handleSubmit, formState:{ errors } } = useForm()
 
-  /* Calculate rental duration & total */
-  const days = useMemo(startDate, endDate)
-  const total = selectedCar ? selectedCar.price * Math.max(days, 1) : 0
+  /* ── Charger les voitures depuis l'API ── */
+  useEffect(() => {
+    const loadCars = async () => {
+      try {
+        setLoadingCars(true)
+        const res = await fetchCars()
+        const list = res.data || []
+        setCars(list)
+        if (preselectedId) {
+          const found = list.find(c => c.id === preselectedId)
+          if (found) { setCar(found); setStep(2) }
+        }
+      } catch (err) {
+        toast.error('Impossible de charger les véhicules')
+      } finally {
+        setLoadingCars(false)
+      }
+    }
+    loadCars()
+  }, [preselectedId])
 
-  function useMemo(s, e) {
-    if (!s || !e) return 0
-    const diff = new Date(e) - new Date(s)
+  /* ── Calcul durée & total ── */
+  const days = useMemo(() => {
+    if (!startDate || !endDate) return 0
+    const diff = new Date(endDate) - new Date(startDate)
     return Math.max(0, Math.ceil(diff / 86400000))
-  }
+  }, [startDate, endDate])
 
+  const total = selectedCar ? Number(selectedCar.price) * Math.max(days, 1) : 0
   const today = new Date().toISOString().split('T')[0]
 
   const goNext = () => setStep(v => Math.min(v + 1, 4))
   const goPrev = () => setStep(v => Math.max(v - 1, 1))
 
-  const onSubmit = (data) => {
-    toast.success('Réservation confirmée ! Vous recevrez un email de confirmation.')
-    setSubmitted(true)
-    setStep(4)
+  /* ── Soumission vers l'API ── */
+  const onSubmit = async (data) => {
+    if (!selectedCar || !startDate || !endDate || days <= 0) {
+      toast.error('Veuillez compléter tous les champs')
+      return
+    }
+    setSubmitting(true)
+    try {
+      const payload = {
+        car_id:     selectedCar.id,
+        first_name: data.firstName,
+        last_name:  data.lastName,
+        email:      data.email,
+        phone:      data.phone,
+        license:    data.license,
+        address:    data.address,
+        start_date: startDate,
+        end_date:   endDate,
+        days,
+        total,
+      }
+      const res = await createBooking(payload)
+      setBookingRef(res.data?.id || null)
+      setSubmitted(true)
+      setStep(4)
+      toast.success('Réservation confirmée ! Un email vous a été envoyé.')
+    } catch (err) {
+      toast.error(err?.response?.data?.message || 'Erreur lors de la réservation')
+    } finally {
+      setSubmitting(false)
+    }
   }
 
   return (
     <motion.div variants={pageVariants} initial="initial" animate="enter" exit="exit">
 
-      {/* Page header */}
+      {/* ── Page header ── */}
       <div style={{
         paddingTop:'calc(var(--nav-height) + 60px)', paddingBottom:'48px',
         background:'linear-gradient(180deg,#0D0D0D 0%,#0A0A0A 100%)',
         borderBottom:'1px solid rgba(255,255,255,0.04)', position:'relative', overflow:'hidden',
       }}>
         <div style={{
-          position:'absolute',inset:0,
+          position:'absolute', inset:0,
           backgroundImage:`linear-gradient(rgba(232,25,44,0.03) 1px,transparent 1px),linear-gradient(90deg,rgba(232,25,44,0.03) 1px,transparent 1px)`,
           backgroundSize:'60px 60px',
         }}/>
@@ -132,45 +176,62 @@ export default function ReservationPage() {
 
         {/* ── Step panels ── */}
         <AnimatePresence mode="wait">
+
+          {/* ÉTAPE 1 — Choisir véhicule */}
           {step === 1 && (
             <StepPanel key="step1">
               <StepTitle>Choisissez votre véhicule</StepTitle>
-              <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill,minmax(240px,1fr))', gap:'16px', marginBottom:'32px' }}>
-                {CARS.map(car => (
-                  <motion.div
-                    key={car.id}
-                    whileHover={{ y:-4 }}
-                    onClick={() => setCar(car)}
-                    style={{
-                      border:`2px solid ${selectedCar?.id === car.id ? '#E8192C' : 'rgba(255,255,255,0.06)'}`,
-                      borderRadius:'10px', overflow:'hidden', cursor:'none',
-                      background: selectedCar?.id === car.id ? 'rgba(232,25,44,0.06)' : 'rgba(20,20,20,0.8)',
-                      boxShadow: selectedCar?.id === car.id ? '0 0 20px rgba(232,25,44,0.2)' : 'none',
-                      transition:'all 0.25s ease',
-                    }}
-                  >
-                    <img src={car.image} alt={car.name} style={{ width:'100%', height:'130px', objectFit:'cover' }} loading="lazy"/>
-                    <div style={{ padding:'14px' }}>
-                      <div style={{ fontFamily:'"Rajdhani",sans-serif', fontSize:'0.68rem', letterSpacing:'0.12em', color:'#E8192C', textTransform:'uppercase' }}>{car.brand}</div>
-                      <div style={{ fontFamily:'"Rajdhani",sans-serif', fontSize:'1rem', fontWeight:700, color:'#fff', marginBottom:'6px' }}>{car.name}</div>
-                      <div style={{ display:'flex', alignItems:'baseline', gap:'3px' }}>
-                        <span style={{ fontFamily:'"Bebas Neue",cursive', fontSize:'1.4rem', color:'#E8192C' }}>{car.price.toLocaleString("fr-FR")} FCFA</span>
-                        <span style={{ fontFamily:'"DM Sans",sans-serif', fontSize:'0.72rem', color:'rgba(255,255,255,0.3)' }}>/jour</span>
+
+              {loadingCars ? (
+                <div style={{ display:'flex', alignItems:'center', justifyContent:'center', padding:'60px', gap:'12px', color:'rgba(255,255,255,0.3)' }}>
+                  <Loader2 size={24} style={{ animation:'spin 1s linear infinite' }}/> Chargement des véhicules…
+                </div>
+              ) : (
+                <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill,minmax(240px,1fr))', gap:'16px', marginBottom:'32px' }}>
+                  {cars.map(car => (
+                    <motion.div
+                      key={car.id}
+                      whileHover={{ y:-4 }}
+                      onClick={() => setCar(car)}
+                      style={{
+                        border:`2px solid ${selectedCar?.id === car.id ? '#E8192C' : 'rgba(255,255,255,0.06)'}`,
+                        borderRadius:'10px', overflow:'hidden', cursor:'none', position:'relative',
+                        background: selectedCar?.id === car.id ? 'rgba(232,25,44,0.06)' : 'rgba(20,20,20,0.8)',
+                        boxShadow: selectedCar?.id === car.id ? '0 0 20px rgba(232,25,44,0.2)' : 'none',
+                        transition:'all 0.25s ease',
+                      }}
+                    >
+                      <img
+                        src={car.image_url || car.image}
+                        alt={car.name}
+                        style={{ width:'100%', height:'130px', objectFit:'cover' }}
+                        loading="lazy"
+                      />
+                      <div style={{ padding:'14px' }}>
+                        <div style={{ fontFamily:'"Rajdhani",sans-serif', fontSize:'0.68rem', letterSpacing:'0.12em', color:'#E8192C', textTransform:'uppercase' }}>{car.brand}</div>
+                        <div style={{ fontFamily:'"Rajdhani",sans-serif', fontSize:'1rem', fontWeight:700, color:'#fff', marginBottom:'6px' }}>{car.name}</div>
+                        <div style={{ display:'flex', alignItems:'baseline', gap:'3px' }}>
+                          <span style={{ fontFamily:'"Bebas Neue",cursive', fontSize:'1.4rem', color:'#E8192C' }}>
+                            {Number(car.price).toLocaleString('fr-FR')} FCFA
+                          </span>
+                          <span style={{ fontFamily:'"DM Sans",sans-serif', fontSize:'0.72rem', color:'rgba(255,255,255,0.3)' }}>/jour</span>
+                        </div>
                       </div>
-                    </div>
-                    {selectedCar?.id === car.id && (
-                      <div style={{
-                        position:'absolute', top:'8px', right:'8px',
-                        width:'22px', height:'22px', background:'#E8192C', borderRadius:'50%',
-                        display:'flex', alignItems:'center', justifyContent:'center',
-                      }}>
-                        <Check size={12} style={{color:'#fff'}}/>
-                      </div>
-                    )}
-                  </motion.div>
-                ))}
-              </div>
-              {!selectedCar && (
+                      {selectedCar?.id === car.id && (
+                        <div style={{
+                          position:'absolute', top:'8px', right:'8px',
+                          width:'22px', height:'22px', background:'#E8192C', borderRadius:'50%',
+                          display:'flex', alignItems:'center', justifyContent:'center',
+                        }}>
+                          <Check size={12} style={{color:'#fff'}}/>
+                        </div>
+                      )}
+                    </motion.div>
+                  ))}
+                </div>
+              )}
+
+              {!selectedCar && !loadingCars && (
                 <p style={{ display:'flex', alignItems:'center', gap:'6px', fontFamily:'"DM Sans",sans-serif', fontSize:'0.85rem', color:'rgba(255,165,0,0.7)', marginBottom:'16px' }}>
                   <AlertCircle size={15}/> Veuillez sélectionner un véhicule pour continuer
                 </p>
@@ -183,6 +244,7 @@ export default function ReservationPage() {
             </StepPanel>
           )}
 
+          {/* ÉTAPE 2 — Dates */}
           {step === 2 && (
             <StepPanel key="step2">
               <StepTitle>Choisissez vos dates</StepTitle>
@@ -193,13 +255,19 @@ export default function ReservationPage() {
                   background:'rgba(232,25,44,0.06)', border:'1px solid rgba(232,25,44,0.15)',
                   borderRadius:'8px', marginBottom:'32px',
                 }}>
-                  <img src={selectedCar.image} alt={selectedCar.name} style={{ width:'70px', height:'48px', objectFit:'cover', borderRadius:'6px' }}/>
+                  <img
+                    src={selectedCar.image_url || selectedCar.image}
+                    alt={selectedCar.name}
+                    style={{ width:'70px', height:'48px', objectFit:'cover', borderRadius:'6px' }}
+                  />
                   <div>
                     <div style={{ fontFamily:'"Rajdhani",sans-serif', fontSize:'0.7rem', letterSpacing:'0.1em', color:'#E8192C', textTransform:'uppercase' }}>{selectedCar.brand}</div>
                     <div style={{ fontFamily:'"Rajdhani",sans-serif', fontSize:'1.1rem', fontWeight:700, color:'#fff' }}>{selectedCar.name}</div>
                   </div>
                   <div style={{ marginLeft:'auto', textAlign:'right' }}>
-                    <div style={{ fontFamily:'"Bebas Neue",cursive', fontSize:'1.5rem', color:'#E8192C' }}>{selectedCar.price.toLocaleString("fr-FR")} FCFA</div>
+                    <div style={{ fontFamily:'"Bebas Neue",cursive', fontSize:'1.5rem', color:'#E8192C' }}>
+                      {Number(selectedCar.price).toLocaleString('fr-FR')} FCFA
+                    </div>
                     <div style={{ fontFamily:'"DM Sans",sans-serif', fontSize:'0.72rem', color:'rgba(255,255,255,0.3)' }}>par jour</div>
                   </div>
                 </div>
@@ -228,11 +296,13 @@ export default function ReservationPage() {
                   }}
                 >
                   <div style={{ fontFamily:'"DM Sans",sans-serif', fontSize:'0.9rem', color:'rgba(255,255,255,0.5)' }}>
-                    <span style={{ color:'#E8192C', fontFamily:'"JetBrains Mono",monospace', fontWeight:500 }}>{days}</span> jour{days>1?'s':''} × {selectedCar.price.toLocaleString("fr-FR")} FCFA
+                    <span style={{ color:'#E8192C', fontFamily:'"JetBrains Mono",monospace', fontWeight:500 }}>{days}</span> jour{days>1?'s':''} × {Number(selectedCar.price).toLocaleString('fr-FR')} FCFA
                   </div>
                   <div>
                     <div style={{ fontFamily:'"Rajdhani",sans-serif', fontSize:'0.7rem', letterSpacing:'0.1em', color:'rgba(255,255,255,0.3)', textTransform:'uppercase', textAlign:'right' }}>Total estimé</div>
-                    <div style={{ fontFamily:'"Bebas Neue",cursive', fontSize:'2rem', color:'#E8192C', letterSpacing:'0.03em', lineHeight:1 }}>{total.toLocaleString('fr-FR')} FCFA</div>
+                    <div style={{ fontFamily:'"Bebas Neue",cursive', fontSize:'2rem', color:'#E8192C', letterSpacing:'0.03em', lineHeight:1 }}>
+                      {total.toLocaleString('fr-FR')} FCFA
+                    </div>
                   </div>
                 </motion.div>
               )}
@@ -246,6 +316,7 @@ export default function ReservationPage() {
             </StepPanel>
           )}
 
+          {/* ÉTAPE 3 — Infos client */}
           {step === 3 && (
             <StepPanel key="step3">
               <StepTitle>Vos informations</StepTitle>
@@ -264,7 +335,7 @@ export default function ReservationPage() {
                       {...register('email',{ required:'Email requis', pattern:{ value:/\S+@\S+\.\S+/, message:'Email invalide' } })}/>
                   </FormField>
                   <FormField label="Téléphone" error={errors.phone?.message}>
-                    <input className="form-input" placeholder="+33 6 12 34 56 78" {...register('phone',{ required:'Téléphone requis' })}/>
+                    <input className="form-input" placeholder="+225 07 12 34 56" {...register('phone',{ required:'Téléphone requis' })}/>
                   </FormField>
                 </div>
                 <FormField label="Numéro de permis de conduire" error={errors.license?.message} style={{ marginBottom:'20px' }}>
@@ -274,7 +345,7 @@ export default function ReservationPage() {
                   <input className="form-input" placeholder="15 Avenue des Champs-Élysées, Paris" {...register('address',{ required:'Adresse requise' })}/>
                 </FormField>
 
-                {/* Summary */}
+                {/* Récapitulatif */}
                 {selectedCar && days > 0 && (
                   <div style={{
                     padding:'20px 24px', background:'rgba(232,25,44,0.05)',
@@ -284,21 +355,27 @@ export default function ReservationPage() {
                       <span style={{ fontFamily:'"DM Sans",sans-serif', fontSize:'0.9rem', color:'rgba(255,255,255,0.5)' }}>
                         {selectedCar.name} · {days} jour{days>1?'s':''} · {startDate} → {endDate}
                       </span>
-                      <span style={{ fontFamily:'"Bebas Neue",cursive', fontSize:'1.8rem', color:'#E8192C' }}>{total.toLocaleString('fr-FR')} FCFA</span>
+                      <span style={{ fontFamily:'"Bebas Neue",cursive', fontSize:'1.8rem', color:'#E8192C' }}>
+                        {total.toLocaleString('fr-FR')} FCFA
+                      </span>
                     </div>
                   </div>
                 )}
 
                 <div style={{ display:'flex', justifyContent:'space-between' }}>
                   <button type="button" className="btn-outline" onClick={goPrev}><ChevronLeft size={16}/> Retour</button>
-                  <button type="submit" className="btn-primary" style={{ fontSize:'0.9rem', padding:'12px 28px' }}>
-                    <CreditCard size={16}/> Confirmer la réservation
+                  <button type="submit" className="btn-primary" disabled={submitting} style={{ fontSize:'0.9rem', padding:'12px 28px', opacity: submitting ? 0.7 : 1 }}>
+                    {submitting
+                      ? <><Loader2 size={16} style={{ animation:'spin 1s linear infinite' }}/> Envoi en cours…</>
+                      : <><CreditCard size={16}/> Confirmer la réservation</>
+                    }
                   </button>
                 </div>
               </form>
             </StepPanel>
           )}
 
+          {/* ÉTAPE 4 — Confirmation */}
           {step === 4 && (
             <StepPanel key="step4">
               <motion.div
@@ -317,9 +394,16 @@ export default function ReservationPage() {
                 <h2 style={{ fontFamily:'"Bebas Neue",cursive', fontSize:'3rem', letterSpacing:'0.05em', color:'#fff', marginBottom:'12px' }}>
                   RÉSERVATION CONFIRMÉE !
                 </h2>
+                {bookingRef && (
+                  <div style={{ fontFamily:'"JetBrains Mono",monospace', fontSize:'0.82rem', color:'rgba(255,255,255,0.3)', marginBottom:'12px' }}>
+                    Référence : <span style={{ color:'#E8192C' }}>#{String(bookingRef).padStart(5,'0')}</span>
+                  </div>
+                )}
                 <p style={{ fontFamily:'"DM Sans",sans-serif', fontSize:'1rem', color:'rgba(255,255,255,0.4)', lineHeight:1.7, maxWidth:'480px', margin:'0 auto 12px' }}>
-                  Votre {selectedCar?.name} est réservé du <strong style={{color:'#fff'}}>{startDate}</strong> au <strong style={{color:'#fff'}}>{endDate}</strong>.
-                  Un email de confirmation vous sera envoyé dans quelques minutes.
+                  Votre <strong style={{color:'#fff'}}>{selectedCar?.name}</strong> est réservé du{' '}
+                  <strong style={{color:'#fff'}}>{startDate}</strong> au{' '}
+                  <strong style={{color:'#fff'}}>{endDate}</strong>.{' '}
+                  Un email de confirmation vous a été envoyé.
                 </p>
                 <div style={{ fontFamily:'"Bebas Neue",cursive', fontSize:'2rem', color:'#E8192C', marginBottom:'36px' }}>
                   Total : {total.toLocaleString('fr-FR')} FCFA
@@ -330,8 +414,10 @@ export default function ReservationPage() {
               </motion.div>
             </StepPanel>
           )}
+
         </AnimatePresence>
       </div>
+      <style>{`@keyframes spin { to { transform: rotate(360deg) } }`}</style>
     </motion.div>
   )
 }
