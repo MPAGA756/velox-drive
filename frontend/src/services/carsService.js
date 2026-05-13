@@ -1,5 +1,5 @@
 import api from './api'
-export const fetchCars = () => api.get('/cars')
+
 /* ── Récupère toutes les voitures avec filtres optionnels ── */
 export async function fetchCars(params = {}) {
   const { data } = await api.get('/cars', { params })
