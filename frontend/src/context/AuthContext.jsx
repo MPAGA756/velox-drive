@@ -1,6 +1,5 @@
 import { createContext, useContext, useState, useEffect, useCallback } from 'react'
-import { loginUser } from '../services/authService'
-import { getMe }     from '../services/authService'
+import { loginUser, getMe } from '../services/authService'
 
 const AuthContext = createContext(null)
 
@@ -11,23 +10,40 @@ export function AuthProvider({ children }) {
   const [user,    setUser]    = useState(null)
   const [loading, setLoading] = useState(true)
 
-  /* ── Au montage : restaure la session depuis localStorage ── */
+  /* ── Restauration de session au chargement ── */
   useEffect(() => {
     const restore = async () => {
       const token      = localStorage.getItem(TOKEN_KEY)
       const storedUser = localStorage.getItem(USER_KEY)
 
-      if (!token) { setLoading(false); return }
+      if (!token) {
+        setLoading(false)
+        return
+      }
 
+      /* Pré-charge l'utilisateur depuis le cache (évite le flash) */
+      if (storedUser) {
+        try { setUser(JSON.parse(storedUser)) } catch {}
+      }
+
+      /* Si c'est un token démo, on ne vérifie pas via API */
+      if (token === 'demo_token') {
+        setLoading(false)
+        return
+      }
+
+      /* Vérifie le token via API */
       try {
-        if (storedUser) setUser(JSON.parse(storedUser))
         const res = await getMe()
         setUser(res.data)
         localStorage.setItem(USER_KEY, JSON.stringify(res.data))
       } catch {
-        localStorage.removeItem(TOKEN_KEY)
-        localStorage.removeItem(USER_KEY)
-        setUser(null)
+        /* Si l'API est indisponible mais qu'on a un user en cache, on le garde */
+        if (!storedUser) {
+          localStorage.removeItem(TOKEN_KEY)
+          localStorage.removeItem(USER_KEY)
+          setUser(null)
+        }
       } finally {
         setLoading(false)
       }
@@ -63,7 +79,10 @@ export function AuthProvider({ children }) {
   const token           = localStorage.getItem(TOKEN_KEY)
 
   return (
-    <AuthContext.Provider value={{ user, loading, login, loginDirect, logout, isAdmin, isAuthenticated, token }}>
+    <AuthContext.Provider value={{
+      user, loading, login, loginDirect, logout,
+      isAdmin, isAuthenticated, token,
+    }}>
       {children}
     </AuthContext.Provider>
   )
