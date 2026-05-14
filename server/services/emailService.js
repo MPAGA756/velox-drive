@@ -1,5 +1,5 @@
 const emailApi = require('../config/mailer')
-const Brevo    = require('@getbrevo/brevo')
+const SibApiV3Sdk = require('sib-api-v3-sdk')
 
 /* ── Helper formatage FCFA ── */
 const fcfa = (n) =>
@@ -11,7 +11,7 @@ const dateStr = (d) =>
 
 /* ── Helper envoi email via Brevo API ── */
 async function sendEmail({ to, subject, html }) {
-  const sendSmtpEmail = new Brevo.SendSmtpEmail()
+  const sendSmtpEmail = new SibApiV3Sdk.SendSmtpEmail()
   sendSmtpEmail.sender      = { email: process.env.MAIL_USER || 'noreply@veloxdrive.fr', name: 'VELOX DRIVE' }
   sendSmtpEmail.to          = [{ email: to }]
   sendSmtpEmail.subject     = subject
