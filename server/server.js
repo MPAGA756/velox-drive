@@ -12,18 +12,7 @@ const PORT = process.env.PORT || 5000
 
 /* ── Middleware ── */
 app.use(cors({
-  origin: function(origin, callback) {
-    const allowed = [
-      process.env.CLIENT_URL,
-      'http://localhost:5173',
-      'https://velox-drive.vercel.app',
-    ]
-    if (!origin || allowed.includes(origin) || origin.endsWith('.vercel.app')) {
-      callback(null, true)
-    } else {
-      callback(new Error('Not allowed by CORS'))
-    }
-  },
+  origin:      process.env.CLIENT_URL || 'http://localhost:5173',
   credentials: true,
 }))
 app.use(express.json())
