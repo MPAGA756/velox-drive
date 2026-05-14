@@ -5,8 +5,6 @@ import { Search, SlidersHorizontal, X, ChevronRight, ChevronDown, Loader2 } from
 import { fetchCars } from '../services/carsService'
 import STATIC_CARS   from '../data/carsData'
 
-const BRANDS       = ['Toutes', ...new Set(ALL_CARS.map(c => c.brand))]
-const CATEGORIES   = ['Toutes', ...new Set(ALL_CARS.map(c => c.category))]
 const TRANSMISSIONS = ['Toutes', 'Automatique', 'Manuelle']
 const FUELS        = ['Tous', 'Essence', 'Électrique', 'Hybride']
 const SORT_OPTIONS = [
@@ -112,7 +110,7 @@ export default function CataloguePage() {
             fontFamily:'"DM Sans",sans-serif', fontSize:'1rem',
             color:'rgba(255,255,255,0.35)', maxWidth:'480px', lineHeight:1.7,
           }}>
-            {ALL_CARS.length} véhicules d'exception disponibles à la location.
+            {allCars.length} véhicules d'exception disponibles à la location.
             Filtrez selon vos critères et réservez en quelques clics.
           </p>
         </div>
