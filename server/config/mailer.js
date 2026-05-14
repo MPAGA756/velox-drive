@@ -1,26 +1,14 @@
-const nodemailer = require('nodemailer')
+const Brevo = require('@getbrevo/brevo')
 
-const transporter = nodemailer.createTransport({
-  host:   'smtp-relay.brevo.com',
-  port:   587,
-  secure: false,
-  requireTLS: true,
-  auth: {
-    user: process.env.MAIL_USER,
-    pass: process.env.MAIL_PASS,
-  },
-  tls: {
-    rejectUnauthorized: false
-  }
-})
+const client = Brevo.ApiClient.instance
+client.authentications['api-key'].apiKey = process.env.BREVO_API_KEY
 
-transporter.verify((err) => {
-  if (err) {
-    console.warn('⚠️  Mailer non configuré :', err.message)
-    console.warn('   → Ajoutez MAIL_USER et MAIL_PASS dans server/.env')
-  } else {
-    console.log('✅ Mailer prêt —', process.env.MAIL_USER)
-  }
-})
+const emailApi = new Brevo.TransactionalEmailsApi()
 
-module.exports = transporter
+if (process.env.BREVO_API_KEY) {
+  console.log('✅ Mailer prêt — Brevo API')
+} else {
+  console.warn('⚠️  Mailer non configuré : BREVO_API_KEY manquant')
+}
+
+module.exports = emailApi
