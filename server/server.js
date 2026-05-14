@@ -11,8 +11,26 @@ const app  = express()
 const PORT = process.env.PORT || 5000
 
 /* ── Middleware ── */
+const ALLOWED_ORIGINS = [
+  process.env.CLIENT_URL,
+  'http://localhost:5173',
+  'http://localhost:4173',
+].filter(Boolean)
+
 app.use(cors({
-  origin:      process.env.CLIENT_URL || 'http://localhost:5173',
+  origin: (origin, callback) => {
+    // Autorise les requêtes sans origin (Postman, mobile, etc.)
+    if (!origin) return callback(null, true)
+    // Autorise si l'origin est dans la liste OU si c'est un sous-domaine Vercel
+    const isVercel = origin.endsWith('.vercel.app')
+    const isAllowed = ALLOWED_ORIGINS.includes(origin)
+    if (isAllowed || isVercel) {
+      callback(null, true)
+    } else {
+      console.warn('CORS bloqué pour :', origin)
+      callback(new Error(`Origine non autorisée : ${origin}`))
+    }
+  },
   credentials: true,
 }))
 app.use(express.json())

@@ -46,16 +46,7 @@ export default function AdminPage() {
   const [modal,    setModal]    = useState(null)
   const [target,   setTarget]   = useState(null)
 
-  if (!user || user.role !== 'admin') {
-    return (
-      <div style={{ minHeight:'100vh',display:'flex',alignItems:'center',justifyContent:'center',background:'#0A0A0A',flexDirection:'column',gap:'24px' }}>
-        <p style={{ fontFamily:'"Rajdhani",sans-serif',fontSize:'1.2rem',color:'rgba(255,255,255,0.4)' }}>Accès réservé aux administrateurs</p>
-        <Link to="/login"><button className="btn-primary">Se connecter</button></Link>
-      </div>
-    )
-  }
-
-  /* ── Chargement initial des données ── */
+  /* ── Chargement initial — AVANT tout return conditionnel ── */
   const loadAll = useCallback(async () => {
     setLoading(true)
     try {
@@ -73,6 +64,16 @@ export default function AdminPage() {
   }, [])
 
   useEffect(() => { loadAll() }, [loadAll])
+
+  /* ── Garde admin — après tous les hooks ── */
+  if (!user || user.role !== 'admin') {
+    return (
+      <div style={{ minHeight:'100vh',display:'flex',alignItems:'center',justifyContent:'center',background:'#0A0A0A',flexDirection:'column',gap:'24px' }}>
+        <p style={{ fontFamily:'"Rajdhani",sans-serif',fontSize:'1.2rem',color:'rgba(255,255,255,0.4)' }}>Accès réservé aux administrateurs</p>
+        <Link to="/login"><button className="btn-primary">Se connecter</button></Link>
+      </div>
+    )
+  }
 
   /* ── Clients déduits des réservations ── */
   const clients = [...new Map(
