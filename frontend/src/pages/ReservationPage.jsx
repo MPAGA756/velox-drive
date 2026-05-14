@@ -6,6 +6,7 @@ import toast from 'react-hot-toast'
 import { ChevronRight, ChevronLeft, Check, Car, User, Calendar, CreditCard, AlertCircle, Loader2 } from 'lucide-react'
 import { fetchCars }      from '../services/carsService'
 import { createBooking }  from '../services/bookingsService'
+import STATIC_CARS        from '../data/carsData'
 
 const STEPS = [
   { id:1, label:'Véhicule',    icon:Car      },
@@ -37,19 +38,24 @@ export default function ReservationPage() {
 
   const { register, handleSubmit, formState:{ errors } } = useForm()
 
-  /* ── Charger les voitures depuis l'API ── */
+  /* ── Charger les voitures depuis l'API avec fallback statique ── */
   useEffect(() => {
     const load = async () => {
       try {
-        const res = await fetchCars()
-        const list = res.data || []
+        const res  = await fetchCars()
+        const list = res.data?.length ? res.data : STATIC_CARS
         setCars(list)
         if (preselectedId) {
           const found = list.find(c => c.id === preselectedId)
           if (found) { setCar(found); setStep(2) }
         }
       } catch {
-        toast.error('Impossible de charger les véhicules')
+        /* API indisponible → données statiques */
+        setCars(STATIC_CARS)
+        if (preselectedId) {
+          const found = STATIC_CARS.find(c => c.id === preselectedId)
+          if (found) { setCar(found); setStep(2) }
+        }
       } finally {
         setCarsLoading(false)
       }

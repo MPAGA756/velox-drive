@@ -1,23 +1,9 @@
-import { useState, useMemo, useRef } from 'react'
+import { useState, useEffect, useMemo, useRef } from 'react'
 import { Link } from 'react-router-dom'
 import { motion, AnimatePresence, useInView } from 'framer-motion'
-import { Search, SlidersHorizontal, X, ChevronRight, ChevronDown } from 'lucide-react'
-
-/* ─── Demo data ─────────────────────────────────────────── */
-const ALL_CARS = [
-  { id:1,  name:'Ferrari Roma',          brand:'Ferrari',      category:'Sport',    price:580000, transmission:'Automatique', fuel:'Essence',    seats:2, image:'https://images.unsplash.com/photo-1592198084033-aade902d1aae?w=800&q=80', badge:'Exclusif'  },
-  { id:2,  name:'Lamborghini Huracán',   brand:'Lamborghini',  category:'Sport',    price:790000, transmission:'Automatique', fuel:'Essence',    seats:2, image:'https://images.unsplash.com/photo-1544636331-e26879cd4d9b?w=800&q=80', badge:'Top'       },
-  { id:3,  name:'Porsche 911 GT3',       brand:'Porsche',      category:'Sport',    price:425000, transmission:'Manuelle',    fuel:'Essence',    seats:2, image:'https://images.unsplash.com/photo-1503376780353-7e6692767b70?w=800&q=80', badge:'Populaire' },
-  { id:4,  name:'Rolls-Royce Ghost',     brand:'Rolls-Royce',  category:'Luxe',     price:640000, transmission:'Automatique', fuel:'Essence',    seats:5, image:'https://images.unsplash.com/photo-1631295868223-63265b40d9e4?w=800&q=80', badge:'Prestige'  },
-  { id:5,  name:'Bentley Continental',   brand:'Bentley',      category:'Luxe',     price:555000, transmission:'Automatique', fuel:'Essence',    seats:4, image:'https://images.unsplash.com/photo-1563137397-04f0311f8e4a?w=800&q=80', badge:null        },
-  { id:6,  name:'McLaren 720S',          brand:'McLaren',      category:'Sport',    price:685000, transmission:'Automatique', fuel:'Essence',    seats:2, image:'https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=800&q=80', badge:'Nouveau'   },
-  { id:7,  name:'Mercedes-AMG GT',       brand:'Mercedes',     category:'Sport',    price:360000, transmission:'Automatique', fuel:'Essence',    seats:2, image:'https://images.unsplash.com/photo-1618843479313-40f8afb4b4d8?w=800&q=80', badge:null        },
-  { id:8,  name:'Tesla Model S Plaid',   brand:'Tesla',        category:'Électrique',price:210000,transmission:'Automatique', fuel:'Électrique', seats:5, image:'https://images.unsplash.com/photo-1617788138017-80ad40651399?w=800&q=80', badge:'Éco'       },
-  { id:9,  name:'BMW M8 Competition',    brand:'BMW',          category:'Sport',    price:315000, transmission:'Automatique', fuel:'Essence',    seats:4, image:'https://images.unsplash.com/photo-1555215695-3004980ad54e?w=800&q=80', badge:null        },
-  { id:10, name:'Aston Martin DB11',     brand:'Aston Martin', category:'Luxe',     price:515000, transmission:'Automatique', fuel:'Essence',    seats:4, image:'https://images.unsplash.com/photo-1544636331-e26879cd4d9b?w=800&q=80', badge:null        },
-  { id:11, name:'Range Rover Autobiography', brand:'Land Rover', category:'SUV',   price:275000, transmission:'Automatique', fuel:'Hybride',    seats:5, image:'https://images.unsplash.com/photo-1566473965997-3de9c817e938?w=800&q=80', badge:'Confort'   },
-  { id:12, name:'Porsche Cayenne Turbo', brand:'Porsche',      category:'SUV',      price:255000, transmission:'Automatique', fuel:'Essence',    seats:5, image:'https://images.unsplash.com/photo-1503376780353-7e6692767b70?w=800&q=80', badge:null        },
-]
+import { Search, SlidersHorizontal, X, ChevronRight, ChevronDown, Loader2 } from 'lucide-react'
+import { fetchCars } from '../services/carsService'
+import STATIC_CARS   from '../data/carsData'
 
 const BRANDS       = ['Toutes', ...new Set(ALL_CARS.map(c => c.brand))]
 const CATEGORIES   = ['Toutes', ...new Set(ALL_CARS.map(c => c.category))]
@@ -37,6 +23,8 @@ const pageVariants = {
 }
 
 export default function CataloguePage() {
+  const [allCars,      setAllCars]      = useState(STATIC_CARS) // pré-chargé avec données statiques
+  const [carsLoading,  setCarsLoading]  = useState(true)
   const [search,       setSearch]       = useState('')
   const [brand,        setBrand]        = useState('Toutes')
   const [category,     setCategory]     = useState('Toutes')
@@ -46,10 +34,30 @@ export default function CataloguePage() {
   const [sort,         setSort]         = useState('price-asc')
   const [filtersOpen,  setFiltersOpen]  = useState(false)
 
+  /* ── Charger depuis l'API, fallback sur données statiques ── */
+  useEffect(() => {
+    const load = async () => {
+      try {
+        const res  = await fetchCars()
+        if (res.data?.length) setAllCars(res.data)
+      } catch {
+        /* API indisponible → on garde STATIC_CARS déjà dans le state */
+      } finally {
+        setCarsLoading(false)
+      }
+    }
+    load()
+  }, [])
+
+  /* ── Options de filtre dynamiques selon les voitures chargées ── */
+  const BRANDS     = ['Toutes', ...new Set(allCars.map(c => c.brand))]
+  const CATEGORIES = ['Toutes', ...new Set(allCars.map(c => c.category))]
+
   /* Filtered + sorted list */
   const filtered = useMemo(() => {
-    let list = ALL_CARS.filter(c => {
+    let list = allCars.filter(c => {
       const q = search.toLowerCase()
+      const img = c.image_url || c.image || ''
       if (q && !c.name.toLowerCase().includes(q) && !c.brand.toLowerCase().includes(q)) return false
       if (brand    !== 'Toutes' && c.brand    !== brand)        return false
       if (category !== 'Toutes' && c.category !== category)    return false
@@ -58,11 +66,11 @@ export default function CataloguePage() {
       if (c.price > maxPrice)                                   return false
       return true
     })
-    if (sort === 'price-asc')  list = list.sort((a,b) => a.price - b.price)
-    if (sort === 'price-desc') list = list.sort((a,b) => b.price - a.price)
-    if (sort === 'name-asc')   list = list.sort((a,b) => a.name.localeCompare(b.name))
+    if (sort === 'price-asc')  list = [...list].sort((a,b) => a.price - b.price)
+    if (sort === 'price-desc') list = [...list].sort((a,b) => b.price - a.price)
+    if (sort === 'name-asc')   list = [...list].sort((a,b) => a.name.localeCompare(b.name))
     return list
-  }, [search, brand, category, transmission, fuel, maxPrice, sort])
+  }, [allCars, search, brand, category, transmission, fuel, maxPrice, sort])
 
   const resetFilters = () => {
     setSearch(''); setBrand('Toutes'); setCategory('Toutes')
@@ -328,7 +336,7 @@ function CarCardFull({ car }) {
     >
       {/* Image */}
       <div style={{ position:'relative', height:'210px', overflow:'hidden' }}>
-        <img src={car.image} alt={car.name}
+        <img src={car.image_url || car.image} alt={car.name}
           style={{ width:'100%', height:'100%', objectFit:'cover',
             transform: hovered ? 'scale(1.08)' : 'scale(1)',
             transition:'transform 0.6s cubic-bezier(0.19,1,0.22,1)' }}

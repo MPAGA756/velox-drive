@@ -528,7 +528,7 @@ function CarCard({ car }) {
       {/* Image */}
       <div style={{ position: 'relative', height: '200px', overflow: 'hidden' }}>
         <img
-          src={car.image}
+          src={car.image_url || car.image}
           alt={car.name}
           style={{
             width:      '100%',
