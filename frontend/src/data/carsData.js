@@ -3,7 +3,7 @@
    n'est pas joignable (mode démo / frontend seul)
    ══════════════════════════════════════════════════════════ */
 const STATIC_CARS = [
-  { id:1,  name:'PAJERO SPORT',              brand:'Mitsubishi',   category:'SUV Sport', price:580000, transmission:'Automatique', fuel:'Essence',    seats:7, image_url:'https://www.mitsubishi-motors.ci/media/gamme/modeles/images/a91baec278b6ff3242b6314fcc755ee1.png', badge:'Exclusif'  },
+  { id:1,  name:'Ferrari Roma',              brand:'Ferrari',      category:'Sport',     price:580000, transmission:'Automatique', fuel:'Essence',    seats:2, image_url:'https://images.unsplash.com/photo-1592198084033-aade902d1aae?w=800&q=80', badge:'Exclusif'  },
   { id:2,  name:'Lamborghini Huracán',       brand:'Lamborghini',  category:'Sport',     price:790000, transmission:'Automatique', fuel:'Essence',    seats:2, image_url:'https://images.unsplash.com/photo-1544636331-e26879cd4d9b?w=800&q=80', badge:'Top'       },
   { id:3,  name:'Porsche 911 GT3',           brand:'Porsche',      category:'Sport',     price:425000, transmission:'Manuelle',    fuel:'Essence',    seats:2, image_url:'https://images.unsplash.com/photo-1503376780353-7e6692767b70?w=800&q=80', badge:'Populaire' },
   { id:4,  name:'Rolls-Royce Ghost',         brand:'Rolls-Royce',  category:'Luxe',      price:640000, transmission:'Automatique', fuel:'Essence',    seats:5, image_url:'https://images.unsplash.com/photo-1631295868223-63265b40d9e4?w=800&q=80', badge:'Prestige'  },

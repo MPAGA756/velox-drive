@@ -12,14 +12,14 @@ import 'swiper/css/pagination'
 const FEATURED_CARS = [
   {
     id: 1,
-    name:         'PAJERO SPORT',
-    brand:        'Mitsubishi',
-    category:     'SUV Sport',
+    name:         'Ferrari Roma',
+    brand:        'Ferrari',
+    category:     'Sport',
     price:        580000,
     transmission: 'Automatique',
     fuel:         'Essence',
-    seats:        7,
-    image:        'https://www.mitsubishi-motors.ci/media/gamme/modeles/images/a91baec278b6ff3242b6314fcc755ee1.png',
+    seats:        2,
+    image:        'https://images.unsplash.com/photo-1592198084033-aade902d1aae?w=800&q=80',
     badge:        'Exclusif',
   },
   {
@@ -69,21 +69,21 @@ const STATS = [
 
 const TESTIMONIALS = [
   {
-    name:   'Aaron smith',
+    name:   'Sophie Martin',
     role:   'CEO, TechVision',
     text:   'Une expérience extraordinaire. La Ferrari Roma était impeccable et le service était digne des plus grands hôtels de luxe. Je recommande sans hésiter.',
     rating: 5,
     avatar: 'SM',
   },
   {
-    name:   'KLAIR NAEL',
+    name:   'Alexandre Dupont',
     role:   'Entrepreneur',
     text:   'J\'ai loué la Lamborghini Huracán pour un week-end et c\'était tout simplement magique. L\'équipe VELOX est professionnelle et réactive.',
     rating: 5,
     avatar: 'AD',
   },
   {
-    name:   'moussavou roland',
+    name:   'Isabelle Leclerc',
     role:   'Architecte',
     text:   'Le Rolls-Royce Ghost pour mon mariage était un rêve éveillé. Tout était parfait, du pickup à la livraison. Merci VELOX DRIVE !',
     rating: 5,
