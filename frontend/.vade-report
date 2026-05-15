@@ -1,0 +1,49 @@
+## Vercel Web Analytics Installation
+
+Successfully installed and configured Vercel Web Analytics for the velox-drive project.
+
+### Changes Made:
+
+**1. Package Installation:**
+- Installed `@vercel/analytics` package (version specified in package.json)
+- Updated `package-lock.json` with the new dependency
+
+**2. Code Integration:**
+- Modified `src/main.jsx` to add Vercel Analytics integration
+- Imported `inject` function from `@vercel/analytics`
+- Called `inject()` before ReactDOM.createRoot() to initialize analytics tracking
+
+### Implementation Details:
+
+Following the official Vercel documentation (https://vercel.com/docs/analytics/quickstart), I implemented the Vite-specific setup:
+- For Vite projects, the recommended approach is to use the `inject()` function in the main entry point
+- The function is called at the top level of `main.jsx` before rendering the React app
+- This ensures analytics tracking is initialized early in the application lifecycle
+
+### Files Modified:
+
+1. **frontend/package.json** - Added @vercel/analytics dependency
+2. **frontend/package-lock.json** - Updated with new package and its dependencies
+3. **frontend/src/main.jsx** - Added analytics injection
+
+### Testing & Verification:
+
+✅ Build verification: Successfully ran `npm run build` - build completed without errors
+✅ Production bundle generated correctly with analytics included
+✅ No breaking changes to existing functionality
+✅ Code follows existing project patterns and conventions
+
+### Next Steps for Activation:
+
+To enable analytics tracking in production:
+1. Enable Web Analytics in the Vercel dashboard (Analytics section)
+2. Deploy the application to Vercel
+3. Verify tracking by checking the browser Network tab for analytics requests
+4. View analytics data in the Vercel dashboard after users visit the site
+
+### Notes:
+
+- The analytics will only send data when deployed to Vercel
+- In development mode, the analytics library runs in a non-tracking mode
+- No additional configuration is required for basic page view tracking
+- All user privacy settings are handled automatically by Vercel Analytics
