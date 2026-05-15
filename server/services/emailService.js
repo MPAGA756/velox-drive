@@ -1,4 +1,4 @@
-const transporter = require('../config/mailer')
+const emailApi = require('../config/mailer')
 
 const fcfa    = (n) => new Intl.NumberFormat('fr-FR').format(n) + ' FCFA'
 const dateStr = (d) => new Date(d).toLocaleDateString('fr-FR', { day:'2-digit', month:'long', year:'numeric' })
@@ -116,12 +116,23 @@ async function sendBookingConfirmation(b) {
 </body></html>`
 
   try {
-    await transporter.sendMail({
-      from:    `"VELOX DRIVE" <${process.env.MAIL_USER}>`,
-      to:      b.email,
-      subject: `✅ Réservation confirmée — ${b.car_name} · Réf. #${String(b.id).padStart(5,'0')}`,
-      html,
-    })
+   await emailApi.sendTransacEmail({
+  sender: {
+    name: 'VELOX DRIVE',
+    email: process.env.MAIL_USER
+  },
+
+  to: [
+    {
+      email: b.email,
+      name: `${b.first_name} ${b.last_name}`
+    }
+  ],
+
+  subject: `✅ Réservation confirmée — ${b.car_name} · Réf. #${String(b.id).padStart(5,'0')}`,
+
+  htmlContent: html
+})
     console.log(`📧 Email envoyé à ${b.email}`)
   } catch (err) {
     console.error('❌ Email client :', err.message)
@@ -172,12 +183,23 @@ async function sendAdminNotification(b) {
 </body></html>`
 
   try {
-    await transporter.sendMail({
-      from:    `"VELOX DRIVE" <${process.env.MAIL_USER}>`,
-      to:      process.env.MAIL_ADMIN,
-      subject: `🔔 Nouvelle réservation #${String(b.id).padStart(5,'0')} — ${b.car_name} (${b.first_name} ${b.last_name})`,
-      html,
-    })
+    await emailApi.sendTransacEmail({
+  sender: {
+    name: 'VELOX DRIVE',
+    email: process.env.MAIL_USER
+  },
+
+  to: [
+    {
+      email: process.env.MAIL_ADMIN,
+      name: 'Admin'
+    }
+  ],
+
+  subject: `🔔 Nouvelle réservation #${String(b.id).padStart(5,'0')} — ${b.car_name}`,
+
+  htmlContent: html
+})
     console.log(`📧 Notification admin envoyée`)
   } catch (err) {
     console.error('❌ Email admin :', err.message)
